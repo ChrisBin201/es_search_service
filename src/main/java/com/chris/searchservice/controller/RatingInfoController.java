@@ -38,10 +38,10 @@ public class RatingInfoController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<?> search(@RequestParam(name = "rating") int rating,
-                                    @RequestParam(name = "product_item_ids") String productItemIdsStr,
-                                    @RequestParam(name = "page") int page,
-                                    @RequestParam(name = "size") int size) {
+    public ResponseEntity<?> search(@RequestParam(name = "rating",defaultValue = "0") int rating,
+                                    @RequestParam(name = "product_item_ids", defaultValue = "") String productItemIdsStr,
+                                    @RequestParam(name = "page", defaultValue = "0") int page,
+                                    @RequestParam(name = "size", defaultValue = "10") int size) {
         ResponseData<PaginationResult<RatingInfo>> response = new ResponseData<>();
         List<Long> productItemId = Arrays.stream(productItemIdsStr.split(",")).map(Long::parseLong).toList();
         PageRequest pageRequest = PageRequest.of(page, size);

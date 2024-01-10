@@ -4,18 +4,17 @@ import com.chris.common.constant.MessageEvent;
 import com.chris.common.repo.elasticsearch.CategoryInfoRepo;
 import com.chris.common.repo.elasticsearch.ProductInfoRepo;
 import com.chris.common.repo.elasticsearch.custom.CustomProductInfoRepo;
-import com.chris.common.service.elasticsearch.ElasticCategoryInfoService;
 import com.chris.common.service.elasticsearch.ElasticOrderInfoService;
 import com.chris.common.service.elasticsearch.ElasticProductInfoService;
 import com.chris.common.service.elasticsearch.ElasticRatingInfoService;
 import com.chris.common.utils.JsonUtil;
 import com.chris.data.elasticsearch.CategoryInfo;
 import com.chris.data.elasticsearch.ProductInfo;
+import com.chris.data.entity.order.Order;
 import com.chris.data.entity.order.OrderLine;
 import com.chris.data.entity.order.Rating;
 import com.chris.data.entity.order.sub.ProductItemDetail;
 import com.chris.data.entity.product.Category;
-import com.chris.data.entity.product.ProductItem;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -196,14 +195,14 @@ public class KafkaConsumer {
 
     // LISTEN FROM ORDER SERVICE
     @KafkaListener(
-            topics = {MessageEvent.CREATE_ORDER},
+            topics = {MessageEvent.CREATE_ORDER, MessageEvent.UPDATE_ORDER_STATUS},
             groupId="es_search_service"
     )
-    public void syncToOrderInfo( String orderLineJson) {
+    public void syncToOrderInfo( String orderJson) {
         try {
-            OrderLine orderLine = JsonUtil.convertJsonToObject(orderLineJson, OrderLine.class);
-            log.info("syncToOrderInfo [{}]", orderLine);
-            long orderInfoId = elasticOrderInfoService.saveOrderInfo(orderLine);
+            Order order = JsonUtil.convertJsonToObject(orderJson, Order.class);
+            log.info("syncToOrderInfo [{}]", order);
+            long orderInfoId = elasticOrderInfoService.saveOrderInfo(order);
             log.info("OrderInfo id {}", orderInfoId);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
@@ -211,18 +210,20 @@ public class KafkaConsumer {
     }
 
     @KafkaListener(
-            topics = {MessageEvent.UPDATE_ORDER_STATUS},
+            topics = {MessageEvent.UPDATE_SALES},
             groupId="es_search_service"
     )
-    public void updateSalesToProductInfo( String orderLineJson) {
+    public void updateSalesToProductInfo( String orderJson) {
         try {
-            OrderLine orderLine = JsonUtil.convertJsonToObject(orderLineJson, OrderLine.class);
-            log.info("syncToOrderInfo [{}]", orderLine);
-            long orderInfoId = elasticOrderInfoService.saveOrderInfo(orderLine);
+            Order order = JsonUtil.convertJsonToObject(orderJson, Order.class);
+            log.info("syncToOrderInfo [{}]", order);
+            long orderInfoId = elasticOrderInfoService.saveOrderInfo(order);
             log.info("OrderInfo id {}", orderInfoId);
-            if(orderLine.getStatus().name().equals(OrderLine.OrderStatus.RATING_PENDING.name())) {
-                 long productInfoId =  elasticProductInfoService.updateSales(orderLine);
-                 log.info("ProductInfo id {}", productInfoId);
+            if(order.getStatus().name().equals(Order.OrderStatus.COMPLETE.name()) && order.getPayoutStatus().name().equals(Order.InvoiceStatus.PAID.name())) {
+                order.getOrderLines().forEach(orderLine -> {
+                    long productInfoId = elasticProductInfoService.updateSales(orderLine);
+                    log.info("ProductInfo id {}", productInfoId);
+                });
             }
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
@@ -230,29 +231,32 @@ public class KafkaConsumer {
     }
 
 
-    @KafkaListener(
-            topics = {MessageEvent.CREATE_RATING, MessageEvent.UPDATE_RATING},
-            groupId="es_search_service"
-    )
-    public void syncToRatingInfo( String ratingJson) {
-        try {
-            Rating rating = JsonUtil.convertJsonToObject(ratingJson, Rating.class);
-            log.info("syncToRatingInfo [{}]", rating);
-            long ratingInfoId = elasticRatingInfoService.saveRatingInfo(rating);
-            log.info("RatingInfo id {}", ratingInfoId);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
-    }
+
+//    @KafkaListener(
+//            topics = {MessageEvent.CREATE_RATING},
+//            groupId="es_search_service"
+//    )
+//    public void syncToRatingInfo( String ratingJson) {
+//        try {
+//            Rating rating = JsonUtil.convertJsonToObject(ratingJson, Rating.class);
+//            log.info("syncToRatingInfo [{}]", rating);
+//            long ratingInfoId = elasticRatingInfoService.saveRatingInfo(rating);
+//            log.info("RatingInfo id {}", ratingInfoId);
+//        } catch (JsonProcessingException e) {
+//            throw new RuntimeException(e);
+//        }
+//    }
 
     @KafkaListener(
-            topics = {MessageEvent.UPDATE_RATING},
+            topics = {MessageEvent.CREATE_RATING,MessageEvent.UPDATE_RATING},
             groupId="es_search_service"
     )
     public void updateRatingAverageToProductInfo( String ratingJson) {
         try {
             Rating rating = JsonUtil.convertJsonToObject(ratingJson, Rating.class);
             log.info("syncToRatingInfo [{}]", rating);
+            long ratingInfoId = elasticRatingInfoService.saveRatingInfo(rating);
+            log.info("RatingInfo id {}", ratingInfoId);
             long productInfoId =  elasticProductInfoService.updateRatingAverage(rating);
             log.info("ProductInfo id {}", productInfoId);
         } catch (JsonProcessingException e) {

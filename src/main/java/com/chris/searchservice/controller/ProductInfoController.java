@@ -30,7 +30,8 @@ public class ProductInfoController extends BaseController {
             @RequestParam(name = "keyword", defaultValue = "") String keyword,
             @RequestParam(name = "rating", defaultValue = "0") int rating,
             @RequestParam(name = "category_id", defaultValue = "0") long categoryId,
-            @RequestParam(name = "price", defaultValue = "0") String price
+            @RequestParam(name = "price", defaultValue = "0") String price,
+            @RequestParam(name = "seller_id", defaultValue = "0") long sellerId
     ) {
         ResponseData<PaginationResult<ProductInfo>> response = new ResponseData<>();
 //        PageRequest pageRequest = pageRequest(sort, page, pageSize);
